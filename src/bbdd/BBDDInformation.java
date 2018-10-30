@@ -16,9 +16,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.Arrays;
+import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.table.DefaultTableModel;
+import net.proteanit.sql.DbUtils;
 /**
  *
  * @author Yosep
@@ -28,7 +30,6 @@ public class BBDDInformation extends javax.swing.JFrame {
     
     
     public Connection connection;
-    String user;
     Statement st;
     PreparedStatement ps;
     CallableStatement cs;
@@ -38,16 +39,17 @@ public class BBDDInformation extends javax.swing.JFrame {
     ResultSetMetaData rsmetadata;
     private DefaultTableModel columna;
     private DefaultTableModel campo;
+    private DefaultTableModel consulta;
     String camposAcumulados;
     
     
-    public BBDDInformation(Connection connection, String usuario) throws SQLException {
+    public BBDDInformation(Connection connection) throws SQLException {
         
         initComponents();        
         this.connection = connection;
-        this.user = usuario;
         columna = (DefaultTableModel) columnasTB.getModel();
         campo = (DefaultTableModel) camposTB.getModel();
+        consulta = (DefaultTableModel) consultaTB.getModel();
         generarTablas();
         //generarColumnas();
     }
@@ -96,14 +98,6 @@ public class BBDDInformation extends javax.swing.JFrame {
         jLabel1.setText("TABLA");
 
         tablasCB.setFont(new java.awt.Font("Consolas", 1, 18)); // NOI18N
-        tablasCB.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusGained(java.awt.event.FocusEvent evt) {
-                tablasCBFocusGained(evt);
-            }
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                tablasCBFocusLost(evt);
-            }
-        });
         tablasCB.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 tablasCBActionPerformed(evt);
@@ -154,9 +148,9 @@ public class BBDDInformation extends javax.swing.JFrame {
         jLabel4.setText("FILTRAR");
 
         columnasCB.setFont(new java.awt.Font("Consolas", 1, 18)); // NOI18N
-        columnasCB.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusGained(java.awt.event.FocusEvent evt) {
-                columnasCBFocusGained(evt);
+        columnasCB.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                columnasCBActionPerformed(evt);
             }
         });
 
@@ -177,6 +171,11 @@ public class BBDDInformation extends javax.swing.JFrame {
 
         ejecutarBT.setFont(new java.awt.Font("Consolas", 1, 18)); // NOI18N
         ejecutarBT.setText("EJECUTAR");
+        ejecutarBT.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                ejecutarBTActionPerformed(evt);
+            }
+        });
 
         consultaTB.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
@@ -284,29 +283,6 @@ public class BBDDInformation extends javax.swing.JFrame {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    private void tablasCBFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_tablasCBFocusLost
-        // TODO add your handling code here:
-        
-        
-        
-        
-    }//GEN-LAST:event_tablasCBFocusLost
-
-    private void tablasCBFocusGained(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_tablasCBFocusGained
-        // TODO add your handling code here:
-        
-        
-        
-        
-    }//GEN-LAST:event_tablasCBFocusGained
-
-    private void columnasCBFocusGained(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_columnasCBFocusGained
-        // TODO add your handling code here:
-        
-        generarOperadores();
-        
-    }//GEN-LAST:event_columnasCBFocusGained
-
     private void tablasCBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tablasCBActionPerformed
         // TODO add your handling code here:
         
@@ -318,6 +294,7 @@ public class BBDDInformation extends javax.swing.JFrame {
         // TODO add your handling code here:
         
         //int selectedColumn = camposTB.getSelectedColumn();
+        //recogemos la fila seleccionada
         int selectedRow = columnasTB.getSelectedRow();
         
         //Si existe una fila seleccionada enonces:
@@ -325,10 +302,14 @@ public class BBDDInformation extends javax.swing.JFrame {
             
             String datosFila[]=new String[1];
             
+            //aqui recogemos el valor de dicho valor en la fila seleccionada y columna 0
             datosFila[0]=columna.getValueAt(selectedRow, 0).toString();
-           
+            
+            //añadimos este valor a la tabla
             campo.addRow(datosFila);
+            //añadimos tambien el valor al combobox
             columnasCB.addItem(datosFila[0]);
+            //borramos el dato que hemos traspasado
             columna.removeRow(selectedRow);
         }
         
@@ -340,33 +321,61 @@ public class BBDDInformation extends javax.swing.JFrame {
     private void valorTFFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_valorTFFocusLost
         // TODO add your handling code here:
         
+        //recogemos la tabla actual seleccionada
         String tablaActual = tablasCB.getSelectedItem().toString();
+        //recogemos el campo del combobox filtro actual seleccionado
         String filtroActual = columnasCB.getSelectedItem().toString();
+        //recogemos el operador actualmente seleccionado
         String operadorActual = operadorCB.getSelectedItem().toString();
-        String valor = valorTF.getText();
+        //recogemos el valor añadido
+        String valor = valorTF.getText().toUpperCase();
         
-        EjecutarTF.setText("SELECT " + camposSQL() + " FROM " + tablaActual + " WHERE " + filtroActual + " " + operadorActual + " " + valor);
+        //le damos al texfiled a ejecutar el siguiente valor para posteriormente ejecutarlo
+        EjecutarTF.setText("SELECT " + camposSQL() + " FROM " + tablaActual + " WHERE " + filtroActual + " " + operadorActual +" '"+ valor+"' ");
     }//GEN-LAST:event_valorTFFocusLost
 
     public String camposSQL(){
         
-        for (int i = 0; i < campo.getRowCount(); i++) {
+        //recogemos el numero de filas que tiene la tabla con los campos que vaos a utilizar
+        int rowCount = campo.getRowCount();
+        //cremaos un array para posteriormente aladir los campos
+        String[] camposTabla = new String[rowCount];
+        //variable para añadir el valor de la tabla que iremos recorriendo
+        String acumulativo;
+        //varibale para comparar campos para evitar que se repitan
+        String comparador;
         
-            camposAcumulados = camposTB.getValueAt(i, 0).toString();
+        //si solo tiene una fila coge le unico valor disponible
+        if(rowCount == 1){
             
+            camposAcumulados = camposTB.getValueAt(0, 0).toString();
             
-            if(camposAcumulados.equals(camposAcumulados))
+        }else{
             
-                camposAcumulados = camposAcumulados;
-            
-            else if(!camposAcumulados.equals(camposAcumulados)){
-                
-                camposAcumulados += camposAcumulados;
-                
-                
+            //hacemos un for para recorrer la tablay guardarlo en nuestro array
+            for (int i = 0; i < rowCount; i++) {
+        
+                //cogemos el valor de cada fila
+                acumulativo = camposTB.getValueAt(i, 0).toString();
+                //lo guardamos en el array
+                camposTabla[i] = acumulativo;                
             }
+            
+            //pones camposAcumulados vacio
+            camposAcumulados = "";
+            
+            //recorremos el array y metemos los valores el la variable camposAcumulados
+            for(int x = 0; x < camposTabla.length; x++){
+            
+                camposAcumulados = camposAcumulados + "," + camposTabla[x];
+            
+            }
+            
+            //eliminamos el primer caracter ya que al estar vacio lo primero que introduce es una coma
+            camposAcumulados = camposAcumulados.substring(1,camposAcumulados.length());
+            
         }
-        
+
         /*String camposAcumulados = datosFila[0];
         camposAcumulados += camposAcumulados;*/
         
@@ -378,49 +387,103 @@ public class BBDDInformation extends javax.swing.JFrame {
         // TODO add your handling code here:
         
         //int selectedColumn = camposTB.getSelectedColumn();
+        //guardamos en la variable la fila seleccionada
         int selectedRow = camposTB.getSelectedRow();
        
         //Si existe una fila seleccionada enonces:
         if(selectedRow>=0){
             
             String datosFila[]=new String[1];
-            
+            //aqui recogemos el valor de dicho valor en la fila seleccionada y columna 0
             datosFila[0]=campo.getValueAt(selectedRow, 0).toString();
             
+            //añadimos a la otra tabla el valor recogido
             columna.addRow(datosFila);
+            
+            //borramos del combobox el campo que hemos devuelto a la otra tabla
             columnasCB.removeItem(datosFila[0]);
+            
+            //borramos la fila que acabamos de pasara a la otra tabla
             campo.removeRow(selectedRow);  
         }
         
     }//GEN-LAST:event_borrarBTActionPerformed
 
+    private void ejecutarBTActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_ejecutarBTActionPerformed
+        // TODO add your handling code here:
+        
+        
+        try {
+            String query = EjecutarTF.getText();
+            st = connection.createStatement();
+            rs = st.executeQuery(query);
+        } catch (SQLException ex) {
+            Logger.getLogger(BBDDInformation.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        consultaTB.setModel(DbUtils.resultSetToTableModel(rs));
+        
+        /*String query = EjecutarTF.getText();
+        String[] camposQuery = new String[campo.getRowCount()];
+        
+        for (int i = 0; i < campo.getRowCount(); i++) {
+        
+                String campos = camposTB.getValueAt(i, 0).toString();
+                camposQuery[i] = campos;                
+            }
+        
+        try {
+            
+            st = connection.createStatement();
+            rs = st.executeQuery(query);
+            
+            for(int i = 0; i < camposQuery.length; i++){
+                
+                consulta.addColumn(camposQuery[i]);
+                
+            }
+            
+            while(rs.next()){
+                
+                Object [] fila = new Object[camposQuery.length];
+                
+                for (int i = 0; i < 3 ; i++){
+                    
+                    fila[i] = rs.getObject(i+1);
+                }
+                
+                consulta.addRow(fila);
+                
+            }
+            
+        } catch (SQLException ex) {
+            Logger.getLogger(BBDDInformation.class.getName()).log(Level.SEVERE, null, ex);
+        }*/  
+    }//GEN-LAST:event_ejecutarBTActionPerformed
+
+    private void columnasCBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_columnasCBActionPerformed
+        // TODO add your handling code here:
+        
+         generarOperadores();
+        
+    }//GEN-LAST:event_columnasCBActionPerformed
+
     
     
     
     public void generarTablas(){
-
+        //eliminamos todos los items para asegurarnos posibles errores 
         tablasCB.removeAllItems();
         
-        try {
-            /*metadata = connection.getMetaData();
-            // establecer sentencia
-            st = connection.createStatement();
-            // recoger los datos de la consulta SQL
-            rs = st.executeQuery("SELECT TABLE_NAME FROM ALL_TABLES WHERE OWNER LIKE '"+user+"'");
-            // recoger la estructura del ResultSet anterior
-            
-            while(rs.next()){
-                
-                tablasCB.addItem(rs.getString(1));
-                
-            }*/
-            
+        try { 
+            //guardamos la metadata
             metadata = connection.getMetaData();
-            user = metadata.getUserName().toUpperCase();
+            //guardamos en user el nombre del esquema
+            String user = metadata.getUserName().toUpperCase();
+            //realizamos el resulset para conseguir las tablas de la base de datos
             rs = metadata.getTables(null,user, "%", new String[]{"TABLE"}); //  metadata.getSchemas().toString().toUpperCase()
             
             while(rs.next()){
-                
+                //rellenamos el combobox con el nombre de las tablas
                 tablasCB.addItem(rs.getString("TABLE_NAME"));
                 
             }
@@ -436,19 +499,21 @@ public class BBDDInformation extends javax.swing.JFrame {
     
     
     public void generarColumnasTB(){
-        
+        //eliminamos las filas de la tabla donde se muestran los campos para que no se repitan o acumulen
         columna.setRowCount(0);
-        
+        //guardamos en la variable tabla la tabla seleccionada en su correspondiente combobox
         String tabla = tablasCB.getSelectedItem().toString();
         
             try {
-            
+            //guardamos la metadata
             metadata = connection.getMetaData();
-            user = metadata.getUserName().toUpperCase();
+            //guardamos en user el nombre del esquema
+            String user = metadata.getUserName().toUpperCase();
+            //realizamos el resulset para conseguir los campos de dicha tabla
             rst = metadata.getColumns(null,user,tabla,"%"); //  metadata.getSchemas().toString().toUpperCase()
             
             while(rst.next()){
-                
+                //aqui recogemos el nombre de los campos de dicha abla
                 columna.addRow(new Object[]{rst.getString("COLUMN_NAME")});               
             }
             
@@ -491,27 +556,32 @@ public class BBDDInformation extends javax.swing.JFrame {
     
     public void generarOperadores(){
         
+        //borramos todos los items del combobos donde apareceran los operadores para evitar que se repitan
         operadorCB.removeAllItems();
         
+        //guardamos en la variable tabla la tabla seleccionada en su correspondiente combobox
         String tabla = tablasCB.getSelectedItem().toString();
+        //guardamos en la variable columna el campo seleccionado en su correspondiente combobox(filtro)
         String columna = columnasCB.getSelectedItem().toString();
 
             try {
-            
+            //recogemos la metadata
             metadata = connection.getMetaData();
-            user = metadata.getUserName().toUpperCase();
+            //guardamos en user el nombre del esquema
+            String user = metadata.getUserName().toUpperCase();
+            //realizamos el resulset para conseguir el tipo de dato que estamos seleccionando el combobox del filtro
             rs = metadata.getColumns(null,user,tabla,columna); //  metadata.getSchemas().toString().toUpperCase()
-            
+            //lo recorremos
             while(rs.next()){
                 
                 //System.out.println(rs.getString("TYPE_NAME"));
-                
+                //si el tipo es varchar2 rellenaremos el cmbobox con los siguientes items
                 if(rs.getString("TYPE_NAME").equals("VARCHAR2")){
 
                     operadorCB.setEnabled(true);
                     operadorCB.addItem("LIKE");
                     operadorCB.addItem("=");
-
+                //si el tipo es number o date rellenaremos el cmbobox con los siguientes items
                 }else if(rs.getString("TYPE_NAME").equals("NUMBER") || rs.getString("TYPE_NAME").equals("DATE")){
 
                     operadorCB.setEnabled(true);
@@ -520,7 +590,8 @@ public class BBDDInformation extends javax.swing.JFrame {
                     operadorCB.addItem(">=");
                     operadorCB.addItem("<=");
                     operadorCB.addItem("=");
-                    
+                
+                //si no hay ningun campo dentro del combobox lo deshabilitamos    
                 }else if(columnasCB.getItemCount() == 0){
                     
                     columnasCB.setEnabled(false);

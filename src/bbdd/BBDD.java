@@ -176,7 +176,7 @@ public class BBDD extends javax.swing.JFrame {
             Class.forName("oracle.jdbc.driver.OracleDriver");
             con = DriverManager.getConnection("jdbc:oracle:thin:@"+Host+":"+Port+":XE",Usuario,Password);  
             dispose();
-            new BBDDInformation(con,Usuario).setVisible(true);
+            new BBDDInformation(con).setVisible(true);
             
             
     
